@@ -59,14 +59,11 @@ mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB Atlas');
 
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on ${PORT}`);
+    app.listen(process.env.PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on ${process.env.PORT}`);
     });
 
   })
   .catch(err => {
-    console.error('❌ MongoDB error:', err.message);
-
-    // IMPORTANT: don't crash container immediately on Railway
-    setTimeout(() => process.exit(1), 5000);
+    console.error('❌ MongoDB error:', err);
   });
