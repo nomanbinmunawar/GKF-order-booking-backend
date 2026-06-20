@@ -7,7 +7,7 @@ const errorHandler = require('./middleware/errorHandler');
 const ordersRouter = require('./routes/orders');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT ;
 
 // ── Security headers ─────────────────────────
 app.use((req, res, next) => {
