@@ -1,15 +1,15 @@
 require('dotenv').config();
-const express      = require('express');
-const mongoose     = require('mongoose');
-const cors         = require('cors');
+const express  = require('express');
+const mongoose = require('mongoose');
+const cors     = require('cors');
 const errorHandler = require('./middleware/errorHandler');
 
 const ordersRouter = require('./routes/orders');
 
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Security headers (manual, no helmet dep) ───────────────────────────────
+// ── Security headers ─────────────────────────
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -17,29 +17,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Core middleware ────────────────────────────────────────────────────────
+// ── Middleware ───────────────────────────────
 app.use(cors({
   origin: process.env.CLIENT_ORIGIN || '*',
   methods: ['GET', 'POST', 'DELETE'],
 }));
+
 app.use(express.json({ limit: '1mb' }));
 
-// Simple in-memory rate limiter (no extra dep)
-const requestCounts = new Map();
-app.use((req, res, next) => {
-  const ip  = req.ip || req.connection.remoteAddress || 'unknown';
-  const key = `${ip}:${Math.floor(Date.now() / 60000)}`; // per minute window
-  const count = (requestCounts.get(key) || 0) + 1;
-  requestCounts.set(key, count);
-  // cleanup old windows periodically
-  if (requestCounts.size > 10000) requestCounts.clear();
-  if (count > 200) {
-    return res.status(429).json({ success: false, message: 'Too many requests. Slow down.' });
-  }
-  next();
-});
-
-// ── Routes ─────────────────────────────────────────────────────────────────
+// ── Routes ───────────────────────────────────
 app.use('/api/orders', ordersRouter);
 
 app.get('/api/health', (req, res) => {
@@ -52,31 +38,35 @@ app.get('/api/health', (req, res) => {
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.method} ${req.originalUrl} not found` });
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.originalUrl} not found`
+  });
 });
 
-// Global error handler (must be last)
+// Error handler
 app.use(errorHandler);
 
-// ── MongoDB ────────────────────────────────────────────────────────────────
+// ── MongoDB + Server START ───────────────────
 const MONGO_URI = process.env.MONGODB_URI;
+
 if (!MONGO_URI) {
-  console.error('❌  MONGODB_URI is not defined in .env');
+  console.error('❌ MONGODB_URI missing');
   process.exit(1);
 }
 
-mongoose
-  .connect(MONGO_URI, {
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  })
+mongoose.connect(MONGO_URI)
   .then(() => {
-    console.log('✅  Connected to MongoDB Atlas');
-  app.listen(5000, "0.0.0.0", () => {
-  console.log("Server running on 5000");
-});
+    console.log('✅ Connected to MongoDB Atlas');
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on ${PORT}`);
+    });
+
   })
   .catch(err => {
-    console.error('❌  MongoDB connection error:', err.message);
-    process.exit(1);
+    console.error('❌ MongoDB error:', err.message);
+
+    // IMPORTANT: don't crash container immediately on Railway
+    setTimeout(() => process.exit(1), 5000);
   });
